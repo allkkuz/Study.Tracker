@@ -276,9 +276,9 @@ select.plain{appearance:none;-webkit-appearance:none;background-image:linear-gra
 .chart .pt{fill:var(--bg);stroke:var(--mark);stroke-width:1.5}
 .chart .pv{fill:var(--ink);font:500 11px var(--f)}
 .chart .empty{fill:var(--muted);font:400 13px var(--f)}
-details.ck{border-bottom:1px solid var(--line)}
-details.ck summary{list-style:none;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 16px;padding:14px 0;cursor:pointer}
-details.ck summary::-webkit-details-marker{display:none}
+details.ck,details.tp{border-bottom:1px solid var(--line)}
+details.ck summary,details.tp summary{list-style:none;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 16px;padding:14px 0;cursor:pointer}
+details.ck summary::-webkit-details-marker,details.tp summary::-webkit-details-marker{display:none}
 .ck-n{font-weight:500}
 .ck-w{font-size:var(--s2);color:var(--muted)}
 .ck-r{grid-row:1/3;grid-column:2;text-align:right;align-self:center}
@@ -470,6 +470,22 @@ details.ck summary::-webkit-details-marker{display:none}
 :root[data-design="route"] .chart .rt-here circle{fill:var(--ink);stroke:var(--bg);stroke-width:3}
 :root[data-design="route"] .chart .rt-here rect{fill:var(--ink)}
 :root[data-design="route"] .chart .rt-here text{fill:var(--bg);font:600 10.5px var(--fd)}
+:root[data-design="route"] .chart .rt-tp{stroke:var(--half);stroke-width:1.5;stroke-dasharray:4 5}
+.keys .k-tp{stroke:var(--half);stroke-width:1.5;stroke-dasharray:3 3}
+#t-goals:empty{display:none}
+:root[data-design="route"] #p-today > #t-goals{order:0}
+.tp-chips{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:10px}
+.tp-chip{display:flex;align-items:center;gap:10px;min-height:52px;padding:8px 14px;border:1px solid var(--line);border-radius:16px;background:transparent;text-align:left;color:var(--ink);font-size:var(--s2);line-height:1.3}
+.tp-chip b{font-weight:600}
+.tp-chip .nw{white-space:nowrap}
+.tp-chip small{margin-left:auto;padding-left:6px;color:var(--muted);font-size:var(--s1);white-space:nowrap}
+.tp-ic{flex:none;width:28px;height:28px;box-sizing:border-box;border-radius:50%;background:var(--ink);color:var(--bg);display:grid;place-items:center}
+.tp-ic svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tp-ic.fin{background:transparent;border:4px solid var(--ink)}
+.tp-ic.fin::after{content:"";width:8px;height:8px;border-radius:50%;background:var(--ink)}
+#targets .tps{border-top:1px solid var(--line);margin-top:18px}
+#targets .tp-foot{margin-top:14px}
+#targets .link.armed{font-weight:500}
 :root[data-design="route"] .k-rt{stroke:var(--acc);stroke-width:5}
 :root[data-design="route"] .k-rp{stroke:var(--mark2);stroke-width:4;stroke-dasharray:.1 6}
 :root[data-design="route"] .chart .ln{stroke-width:3}
@@ -616,6 +632,7 @@ details.ck summary::-webkit-details-marker{display:none}
         <button type="button" class="icon" id="nav-next" data-nav="1" aria-label="Следующий день"><svg viewBox="0 0 16 16"><path d="M6 3l5 5-5 5"/></svg></button>
       </div>
     </div>
+    <div id="t-goals"></div>
     <div id="t-main">
       <div class="meter" id="t-meter"></div>
       <div class="bar segs" id="t-bar"></div>
@@ -674,7 +691,13 @@ const NEW_ITEMS = [
   {id:"reading", name:"Чтение",               min:50, res:"Oxford Bookworms, позже финансовые статьи; в метро", days:[1,2,3,4,5], skills:["reading"]}
 ];
 const DEFAULT_ITEMS = NEW_ITEMS;
-const DEFAULT_CFG = { start:"2026-10-19", end:"2027-06-06", tests:{on:true, from:1, to:5, testMin:60, essayMin:60}, goalLevel:"", goalScore:null, cal:{ wk:"19:00", we:"11:00", alarm:false, times:{} }, applied:["upd-2510"] };
+/* target points: NES «Мастер финансов», admission 2027 (mif-nes.ru); the score is a mock test in the exam's format */
+const DEFAULT_TARGETS = [
+  { id:"nes-olymp", name:"Олимпиада РЭШ", date:"2027-04-17", goal:35, note:"Онлайн, математика и английский в один день. Высокий балл засчитывается вместо экзамена." },
+  { id:"nes-exam", name:"Экзамены РЭШ", date:"2027-06-19", goal:40, note:"Английский — 60 минут: 30 вопросов Structure and Written Expression и 20 Reading Comprehension, как в TOEFL." }
+];
+const DEFAULT_MOCK = { name:"Пробник РЭШ", max:50 };
+const DEFAULT_CFG = { start:"2026-10-19", end:"2027-06-06", tests:{on:true, from:1, to:5, testMin:60, essayMin:60}, goalLevel:"", goalScore:null, cal:{ wk:"19:00", we:"11:00", alarm:false, times:{} }, applied:["upd-2510"], targets:DEFAULT_TARGETS, mock:DEFAULT_MOCK };
 const design = "route";
 document.documentElement.dataset.design = design;
 const KEY = "eng-june-v2", KEY_V1 = "eng-june-v1", KEY_TAB = "eng-june-tab", KEY_BACKUP = "eng-june-last-backup";
@@ -739,6 +762,16 @@ function normalize(r){
     s.cfg.cal = { wk: isHM(cl.wk) ? cl.wk : "19:00", we: isHM(cl.we) ? cl.we : "11:00", alarm: !!cl.alarm, times:{} };
     if (cl.times && typeof cl.times === "object") for (const [k, v] of Object.entries(cl.times)) if (/^[\w-]{1,40}$/.test(k) && isHM(v)) s.cfg.cal.times[k] = v;
     s.cfg.applied = Array.isArray(c.applied) ? c.applied.filter(x => typeof x === "string").slice(0, 20) : [];   // trackers made before the update see the new schedule offered
+    const mk = c.mock && typeof c.mock === "object" ? c.mock : {};
+    s.cfg.mock = { name: String(mk.name || DEFAULT_MOCK.name).slice(0, 40).trim() || "Пробник", max: clampInt(mk.max, 5, 300, DEFAULT_MOCK.max) };
+    if (Array.isArray(c.targets)) {   // a tracker saved before target points existed gets the defaults
+      const seen = new Set();
+      s.cfg.targets = c.targets.filter(x => x && typeof x === "object" && isISO(x.date)).slice(0, 12).map(x => {
+        let id = typeof x.id === "string" && /^[\w-]{1,40}$/.test(x.id) ? x.id : newId(); if (seen.has(id)) id = newId(); seen.add(id);
+        const g = Math.round(Number(x.goal));
+        return { id, name: String(x.name || "Целевая точка").slice(0, 60), date: x.date, goal: g >= 1 ? Math.min(g, s.cfg.mock.max) : null, note: typeof x.note === "string" ? x.note.slice(0, 300) : "" };
+      });
+    }
     const cu = c.catchup;
     s.cfg.catchup = cu && isISO(cu.from) && isISO(cu.to) && Array.isArray(cu.days) ? { from:cu.from, to:cu.to, min:clampInt(cu.min, 5, 600, 30), days:cu.days.map(Number).filter(d => d >= 0 && d <= 6) } : null;
   }
@@ -844,7 +877,8 @@ function testState(k){
   const e = Number(r.efset);
   return { testDone:!!r.testDone, essayDone:!!r.essayDone, efset: r.efset !== null && r.efset !== "" && e >= 1 && e <= 100 ? Math.round(e) : null,
     cefr: LEVELS.includes(r.cefr) ? r.cefr : "", tracktest: LEVELS.includes(r.tracktest) ? r.tracktest : "",
-    dialang: typeof r.dialang === "string" ? r.dialang : "", essay: typeof r.essay === "string" ? r.essay : "", note: typeof r.note === "string" ? r.note : "" };
+    dialang: typeof r.dialang === "string" ? r.dialang : "", essay: typeof r.essay === "string" ? r.essay : "", note: typeof r.note === "string" ? r.note : "",
+    mock: r.mock !== null && r.mock !== "" && r.mock !== undefined && Number(r.mock) >= 0 && Number(r.mock) <= S.cfg.mock.max ? Math.round(Number(r.mock)) : null };
 }
 const checkFact = k => { const ts = testState(k); return (ts.testDone ? S.cfg.tests.testMin : 0) + (ts.essayDone ? S.cfg.tests.essayMin : 0); };
 /* a level from the score wins; a level typed without a score is the fallback */
@@ -1032,6 +1066,7 @@ function renderToday(){
   const d = sel, t = todayISO(), r = dayRec(d), p = planFor(d);
   const W = D.weeks.length, wi = weekIdx(d);
   $("#t-upd").innerHTML = updBannerHTML();
+  $("#t-goals").innerHTML = tpChipsHTML();
   $("#d-num").textContent = dnum(d);
   $("#d-wd").textContent = cap(WD[dow(d)]);
   const rel = d === t ? "сегодня" : d < t ? "прошедший день" : "впереди";
@@ -1067,7 +1102,7 @@ function renderToday(){
     const title = ch.label === "Старт" ? "Стартовый тест" : ch.label === "Итог" ? "Итоговый тест" : "Контрольный тест";
     tt.hidden = false;
     tt.innerHTML = `<div class="notice"><b>${title}, ${range(ch.win[0], ch.win[1])}</b>
-      <p>Тест уровня и эссе. Результат запишите на вкладке <button type="button" class="link" data-tab="tests" data-open="${ch.k}">Цель</button>.</p>
+      <p>Тест уровня и эссе${S.cfg.targets.length ? `, по желанию — ${esc(S.cfg.mock.name.charAt(0).toLowerCase() + S.cfg.mock.name.slice(1))}` : ""}. Результаты запишите на вкладке <button type="button" class="link" data-tab="tests" data-open="${ch.k}">Цель</button>.</p>
       <div class="list">
         ${itemRow({id:"t", name:"Тест пройден", min:tm.testMin, res:""}, ts.testDone, "", { fixed:true, attrs:`data-tflag="testDone" data-k="${ch.k}"` })}
         ${itemRow({id:"e", name:"Эссе написано", min:tm.essayMin, res:""}, ts.essayDone, "", { fixed:true, attrs:`data-tflag="essayDone" data-k="${ch.k}"` })}
@@ -1575,7 +1610,7 @@ function ckSummary(c){
     t > c.win[1] ? "пропущен" : t < c.win[0] ? "впереди" : "идёт сейчас";
   const ms = milestones(), i = D.checks.indexOf(c), m = ms && ms[i] !== null && i > 0 ? ms[i] : null;
   const vs = m !== null && ts.efset ? (ts.efset === m ? ", ровно" : ts.efset > m ? `, выше на ${ts.efset - m}` : `, ниже на ${m - ts.efset}`) : "";
-  return `<span class="ck-n">${c.label}</span><span class="ck-r">${lvl ? esc(lvl) + (ts.efset ? ", " + ts.efset : "") : "—"}<small>${flags}</small></span><span class="ck-w">${range(c.win[0], c.win[1])}${m !== null ? ` · ориентир ${m}${vs}` : ""}</span>`;
+  return `<span class="ck-n">${c.label}</span><span class="ck-r">${lvl ? esc(lvl) + (ts.efset ? ", " + ts.efset : "") : "—"}<small>${flags}</small></span><span class="ck-w">${range(c.win[0], c.win[1])}${m !== null ? ` · ориентир ${m}${vs}` : ""}${ts.mock !== null ? ` · пробник ${ts.mock} из ${S.cfg.mock.max}` : ""}</span>`;
 }
 let testsDirty = false;
 function renderTests(force){
@@ -1598,6 +1633,7 @@ function renderTests(force){
       <div class="shift"><span class="muted">Сдвинуть срок</span><button type="button" class="link" data-shift="-1">на месяц раньше</button><button type="button" class="link" data-shift="1">на месяц позже</button></div>
       ${goalMsg ? `<p class="msg" role="status">${esc(goalMsg)}</p>` : ""}
     </section>
+    ${targetsHTML()}
     <section>
       <h2>Путь</h2>
       <div class="path" id="g-path">${pathHTML()}</div>
@@ -1632,6 +1668,7 @@ function renderTests(force){
             </div>
             <div class="grid2">
               <label class="field" for="${id}-ef">Балл, 1–100<input class="plain" type="number" inputmode="numeric" min="1" max="100" id="${id}-ef" data-k="${c.k}" data-f="efset" value="${ts.efset ?? ""}"></label>
+              <label class="field" for="${id}-mk">${esc(S.cfg.mock.name)}, верных из ${S.cfg.mock.max}<input class="plain" type="number" inputmode="numeric" min="0" max="${S.cfg.mock.max}" id="${id}-mk" data-k="${c.k}" data-f="mock" value="${ts.mock ?? ""}"></label>
               <label class="field" for="${id}-cf">Уровень<select class="plain" id="${id}-cf" data-k="${c.k}" data-f="cefr">${opts(ts.cefr, ts.efset)}</select></label>
               <label class="field" for="${id}-tt">Уровень по второму тесту<select class="plain" id="${id}-tt" data-k="${c.k}" data-f="tracktest">${opts(ts.tracktest, null)}</select></label>
               <label class="field" for="${id}-dl">Уровень по навыкам<input class="plain" type="text" id="${id}-dl" data-k="${c.k}" data-f="dialang" placeholder="Listening B1, Reading B2" value="${esc(ts.dialang)}"></label>
@@ -1653,6 +1690,7 @@ function refreshTests(){
   if (gl && document.activeElement !== gl) gl.value = g.lvl;
   if (gs && document.activeElement !== gs) gs.value = g.score || "";
   D.checks.forEach(ch => { const el = document.getElementById("c" + ch.k.replace("-", "") + "-sum"); if (el) el.innerHTML = ckSummary(ch); });
+  refreshTargets();
 }
 function editTest(k, f, v){ const ts = testState(k); ts[f] = v; S.tests[k] = ts; }
 
@@ -1929,7 +1967,7 @@ function buildStatsWorkbook(){
     const ey = Number(S.cfg.end.slice(0,4)), em = Number(S.cfg.end.slice(5,7));
     while ((y < ey || (y === ey && m <= em)) && months.length < 30) { months.push({ y, m, k:y + "-" + pad(m) }); m++; if (m > 12) { m = 1; y++; } } }
   const mRows = [[H("Месяц"), H("Название"), H("Занятия, план, мин"), H("Занятия, факт, мин"), H("Тест и эссе, план, мин"), H("Тест и эссе, факт, мин"),
-    H("План, ч"), H("Факт, ч"), H("% плана"), H("Окно теста"), H("Тест до"), H("Тест пройден"), H("Эссе написано"), H("Балл"), H("Ориентир, балл"), H("Уровень"), H("Второй тест"), H("По навыкам"), H("Тема эссе"), H("Выводы")]];
+    H("План, ч"), H("Факт, ч"), H("% плана"), H("Окно теста"), H("Тест до"), H("Тест пройден"), H("Эссе написано"), H("Балл"), H("Ориентир, балл"), H("Уровень"), H("Второй тест"), H("По навыкам"), H("Тема эссе"), H("Выводы"), H(`${S.cfg.mock.name}, верных из ${S.cfg.mock.max}`)]];
   const msX = milestones();
   months.forEach((o, i) => {
     const r = i + 2, ds = D.days.filter(d => d.slice(0, 7) === o.k), ch = D.checks.find(c => c.k === o.k), ts = testState(o.k);
@@ -1945,9 +1983,16 @@ function buildStatsWorkbook(){
       ch ? (ts.testDone ? "да" : "нет") : "", ch ? (ts.essayDone ? "да" : "нет") : "",
       ts.efset ? { v:ts.efset, s:5 } : null, (() => { const ci = ch ? D.checks.indexOf(ch) : -1; return msX && ci > 0 && msX[ci] !== null ? { v:msX[ci], s:5 } : null; })(),
       checkLevel(ts) && ch ? checkLevel(ts) : "", ts.tracktest || "", ts.dialang || "",
-      ts.essay ? { v:ts.essay, s:7 } : null, ts.note ? { v:ts.note, s:7 } : null]);
+      ts.essay ? { v:ts.essay, s:7 } : null, ts.note ? { v:ts.note, s:7 } : null, ts.mock !== null ? { v:ts.mock, s:5 } : null]);
   });
   const mLast = months.length + 1;
+
+  /* Целевые точки */
+  const mr = mockRes(), lastM = mr.length ? mr[mr.length - 1] : null, MX = S.cfg.mock.max;
+  const tRows = [[H("Точка"), H("Дата"), H("Дней до даты"), H("Цель, верных"), H("Вопросов"), H("Последний пробник"), H("Нужно в месяц"), H("Заметка")]];
+  sortedTargets().forEach((tp, i) => { const r = i + 2, mo = lastM ? Math.max(moBetween(lastM.c.win[0], tp.date), 0.5) : 0;
+    tRows.push([tp.name, { d:tp.date }, { f:`B${r}-'Сводка'!$B$3`, v:diff(t, tp.date), s:5 }, tp.goal ? { v:tp.goal, s:5 } : null, { v:MX, s:5 }, lastM ? { v:lastM.v, s:5 } : null,
+      lastM && tp.goal && tp.date > t && tp.goal > lastM.v ? { v:(tp.goal - lastM.v) / mo, s:3 } : null, tp.note ? { v:tp.note, s:7 } : null]); });
 
   /* По неделям */
   const wRows = [[H("Неделя"), H("С"), H("По"), H("План, мин"), H("Факт, мин"), H("% плана"), H("Факт, ч")]];
@@ -2012,6 +2057,8 @@ function buildStatsWorkbook(){
     ["Цель", g.lvl || g.score ? `${g.lvl || "—"}${g.score ? `, ${g.score}+ баллов` : ""}` : "не задана"],
     ["Срок цели", { d:S.cfg.end }],
     ["Текущий уровень", cl && (cl.lvl || cl.score) ? `${cl.lvl || "—"}${cl.score ? `, ${cl.score} баллов` : ""}` : "нет данных"],
+    ["Ближайшая целевая точка", (() => { const nx = sortedTargets().find(tp => tp.date >= t); return nx ? `${nx.name}, ${fmtDate(nx.date)}${nx.goal ? `, цель ${nx.goal} из ${MX}` : ""}` : "нет"; })()],
+    ["Последний пробник", lastM ? `${lastM.v} из ${MX}` : "нет данных"],
     [],
     [{ v:`Выгрузка из трекера занятий английским. Минуты по плану и факту — по отметкам в приложении; итоги пересчитываются формулами из листов «По дням» и «По месяцам». Дней подряд — значение на дату выгрузки.`, s:8 }]];
 
@@ -2020,7 +2067,8 @@ function buildStatsWorkbook(){
     { name:"Сводка", rows:sum, widths:[34, 30] },
     { name:"По дням", rows:days, widths:[12, 6, 8, 9, 10, 10, 9, 15, 12, ...ids.map(() => 13), 40], freeze:1, filter:`A1:${lastCol}${last}` },
     { name:"По неделям", rows:wRows, widths:[9, 12, 12, 11, 11, 9, 9], freeze:1 },
-    { name:"По месяцам", rows:mRows, widths:[9, 15, 12, 12, 12, 12, 9, 9, 9, 13, 12, 12, 12, 8, 10, 9, 11, 22, 26, 34], freeze:1 },
+    { name:"По месяцам", rows:mRows, widths:[9, 15, 12, 12, 12, 12, 9, 9, 9, 13, 12, 12, 12, 8, 10, 9, 11, 22, 26, 34, 14], freeze:1 },
+    { name:"Целевые точки", rows:tRows, widths:[22, 12, 12, 12, 10, 14, 12, 50], freeze:1 },
     { name:"По занятиям", rows:aRows, widths:[20, 12, 22, 34, 12, 12, 9, 9, 9], freeze:1 },
     { name:"По навыкам", rows:sRows, widths:[16, 10, 10, 10] },
     { name:"План", rows:pRows, widths:[12, 20, 8, 24, 14, 34, 44], freeze:1 }
@@ -2160,6 +2208,12 @@ function buildICS(){
     L.push("BEGIN:VEVENT", `UID:check-${c.k}@english-plan`, "DTSTAMP:" + stamp, "DTSTART;VALUE=DATE:" + icsD(c.win[0]), "DTEND;VALUE=DATE:" + icsD(add(c.win[1], 1)),
       "SUMMARY:" + icsEsc(title), "DESCRIPTION:" + icsEsc("Тест уровня и эссе. Результат запишите в трекере."), "TRANSP:TRANSPARENT", "END:VEVENT");
   });
+  sortedTargets().filter(tp => tp.date >= calFrom()).forEach(tp => {
+    L.push("BEGIN:VEVENT", `UID:target-${tp.id}@english-plan`, "DTSTAMP:" + stamp, "DTSTART;VALUE=DATE:" + icsD(tp.date), "DTEND;VALUE=DATE:" + icsD(add(tp.date, 1)), "SUMMARY:" + icsEsc(tpTitle(tp)));
+    if (tp.note) L.push("DESCRIPTION:" + icsEsc(tp.note));
+    if (S.cfg.cal.alarm) L.push("BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + icsEsc(tp.name), "TRIGGER:-P7D", "END:VALARM");
+    L.push("END:VEVENT");
+  });
   L.push("BEGIN:VEVENT", "UID:deadline@english-plan", "DTSTAMP:" + stamp, "DTSTART;VALUE=DATE:" + icsD(S.cfg.end), "DTEND;VALUE=DATE:" + icsD(add(S.cfg.end, 1)),
     "SUMMARY:" + icsEsc(goalTitle()), "TRANSP:TRANSPARENT", "END:VEVENT");
   L.push("END:VCALENDAR");
@@ -2178,6 +2232,7 @@ function gcalLinks(){
   }));
   calTests().forEach(({ c, title }) => out.push({ label:title, meta:range(c.win[0], c.win[1]), url: gcalUrl({ text:title, dates:`${icsD(c.win[0])}/${icsD(add(c.win[1], 1))}`, details:"Тест уровня и эссе. Результат запишите в трекере." }) }));
   if (calFrom() <= S.cfg.end) out.push({ label:goalTitle(), meta:fmtDate(S.cfg.end), url: gcalUrl({ text:goalTitle(), dates:`${icsD(S.cfg.end)}/${icsD(add(S.cfg.end, 1))}` }) });
+  sortedTargets().filter(tp => tp.date >= calFrom()).forEach(tp => out.push({ label:tpTitle(tp), meta:fmtDate(tp.date), url: gcalUrl({ text:tpTitle(tp), dates:`${icsD(tp.date)}/${icsD(add(tp.date, 1))}`, details:tp.note }) }));
   return out;
 }
 /* items shown in the time list: everything scheduled from today to the deadline */
@@ -2336,6 +2391,162 @@ function debtLineHTML(){
   return `<p class="debt">Отставание от графика — ${hrs(info.debt)} ч. <button type="button" class="link" data-tab="plan" data-scroll="catchup">План догонки</button></p>`;
 }
 
+/* ---------- target points: dates by which a result is needed (an olympiad, an exam) ----------
+   The result is measured by a mock test in the exam's format; its score is logged at the monthly checkpoint. */
+const FLAG_SVG = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 14V2.5M3.5 3h8l-1.8 2.8 1.8 2.7h-8"/></svg>`;
+let tpMsg = "", tpDelArm = null, tpArmT = null;
+const openTps = new Set();
+const sortedTargets = () => S.cfg.targets.slice().sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+const mockRes = () => D.checks.map((c, i) => ({ c, i, v: testState(c.k).mock })).filter(o => o.v !== null);
+const tpDom = tp => "tp" + tp.id.replace(/[^\w-]/g, "");
+const tpTitle = tp => tp.name + (tp.goal ? ` — цель ${tp.goal} из ${S.cfg.mock.max}` : "");
+function tpWhen(tp){ const n = diff(todayISO(), tp.date); return n > 0 ? `через ${n} ${plural(n, DAYW)}` : n === 0 ? "сегодня" : "дата прошла"; }
+function targetCalc(tp){
+  const t = todayISO(), ms = mockRes(), M = S.cfg.mock.max, first = ms[0] || null, last = ms.length ? ms[ms.length - 1] : null;
+  const o = { rows: [], verdict: "", state: "", short: "" };
+  if (tp.date < t) { o.state = "past"; o.short = "дата прошла"; o.verdict = "Дата прошла. Поменяйте её или удалите точку."; return o; }
+  if (!tp.goal) { o.state = "nogoal"; o.short = "цель не задана"; o.verdict = `Впишите, сколько верных ответов из ${M} нужно к этой дате.`; return o; }
+  if (!last) { o.state = "nodata"; o.short = "нужен первый пробник"; o.verdict = `Запишите результат пробника в контрольной точке — от него посчитается нужный темп к ${tp.goal} из ${M}.`; return o; }
+  const left = tp.goal - last.v;
+  o.rows.push(["Последний пробник", `${last.v} из ${M}, ${range(last.c.win[0], last.c.win[1])}`]);
+  if (left <= 0) { o.state = "done"; o.short = "цель уже взята"; o.verdict = `Цель уже взята: ${last.v} при цели ${tp.goal}. Можно поднять планку.`; return o; }
+  const mo = Math.max(moBetween(last.c.win[0], tp.date), 0.5), need = left / mo;
+  o.rows.push(["Осталось набрать", `${tp.goal} − ${last.v} = ${left}`]);
+  o.rows.push(["Нужный темп", `${left} ÷ ${fmt1(mo)} мес. ≈ ${sgn(need)} в месяц`]);
+  if (ms.length >= 2) {
+    const span = moBetween(first.c.win[0], last.c.win[0]);
+    if (span >= 0.9) {   // two results a few days apart say nothing about the pace
+      const pace = (last.v - first.v) / span, proj = Math.max(0, Math.min(M, Math.round(last.v + pace * mo)));
+      o.rows.push(["Ваш темп", `${first.v} → ${last.v} за ${fmt1(span)} мес. ≈ ${sgn(pace)} в месяц`]);
+      o.rows.push([`Прогноз к ${fmtShort(tp.date)}`, `≈ ${proj} из ${M}`]);
+      if (proj >= tp.goal) { o.state = "ok"; o.short = "успеваете"; o.verdict = `Успеваете: в таком темпе к ${fmtShort(tp.date)} будет около ${proj} из ${M}.`; }
+      else { o.state = "behind"; o.short = "пока не успеваете"; o.verdict = `Пока не успеваете: нужно ${sgn(need)} в месяц, а ваш темп ${sgn(pace)}. Добавьте практики в формате экзамена.`; }
+      return o;
+    }
+  }
+  o.state = "early"; o.short = `нужно ${sgn(need)} в месяц`;
+  o.verdict = `Чтобы к ${fmtShort(tp.date)} выйти на ${tp.goal} из ${M}, нужно в среднем ${sgn(need)} в месяц. ${ms.length >= 2 ? "Ваш темп появится, когда между пробниками пройдёт хотя бы месяц." : "Ваш темп появится после второго пробника."}`;
+  return o;
+}
+function tpSummary(tp){
+  const o = targetCalc(tp), M = S.cfg.mock.max;
+  return `<span class="ck-n">${esc(tp.name)}</span><span class="ck-r">${tp.goal ? `цель ${tp.goal} из ${M}` : "—"}<small>${esc(o.short)}</small></span><span class="ck-w">${fmtDate(tp.date)}, ${WD2[dow(tp.date)].toLowerCase()} · ${tpWhen(tp)}</span>`;
+}
+function tpCalcHTML(tp){ const o = targetCalc(tp); return `<p class="verdict">${esc(o.verdict)}</p>` + (o.rows.length ? `<div class="rows">${rowsHTML(o.rows)}</div>` : ""); }
+function tpLateHTML(){
+  const t = todayISO(), late = sortedTargets().filter(tp => tp.date > S.cfg.end && tp.date >= t).pop();
+  return late ? `<p class="msg">«${esc(late.name)}» — ${fmtDate(late.date)}, позже срока плана (${fmtDate(S.cfg.end)}). <button type="button" class="link" data-endto="${late.date}">Сдвинуть срок на ${fmtShort(late.date)}</button></p>` : "";
+}
+function tpRowHTML(tp){
+  const M = S.cfg.mock.max, id = tpDom(tp), tid = esc(tp.id);
+  return `<details class="tp" data-tp="${tid}" ${openTps.has(tp.id) ? "open" : ""}>
+    <summary id="${id}-sum">${tpSummary(tp)}</summary>
+    <div class="ck-body">
+      <div class="grid2">
+        <label class="field" for="${id}-n">Название<input class="plain" id="${id}-n" data-tp="${tid}" data-tf="name" maxlength="60" value="${esc(tp.name)}"></label>
+        <label class="field" for="${id}-d">Дата<input class="plain" type="date" id="${id}-d" data-tp="${tid}" data-tf="date" value="${tp.date}"></label>
+        <label class="field" for="${id}-g">Цель, верных из ${M}<input class="plain" type="number" inputmode="numeric" min="1" max="${M}" id="${id}-g" data-tp="${tid}" data-tf="goal" placeholder="—" value="${tp.goal ?? ""}"></label>
+      </div>
+      <label class="field" for="${id}-nt">Заметка<input class="plain" id="${id}-nt" data-tp="${tid}" data-tf="note" maxlength="300" value="${esc(tp.note)}"></label>
+      <div id="${id}-calc">${tpCalcHTML(tp)}</div>
+      <div><button type="button" class="link" data-tpdel="${tid}">Удалить точку</button></div>
+    </div></details>`;
+}
+function targetsHTML(){
+  const M = S.cfg.mock, list = sortedTargets();
+  return `<section id="targets">
+      <h2>Целевые точки</h2>
+      <p class="sub">Даты, к которым нужен результат. Его меряет пробник в формате экзамена: число верных ответов записывается в контрольной точке раз в месяц.</p>
+      ${list.length ? `<div class="keys">${lineKey("k-rt")}Пробники${lineKey("k-rp")}Путь к целям<svg width="18" height="18" aria-hidden="true"><circle class="k-goal" cx="9" cy="9" r="6"/></svg>Целевая точка</div>
+      <div id="tp-chart">${mockSVG()}</div>` : ""}
+      ${list.length ? `<div class="tps">${list.map(tpRowHTML).join("")}</div>` : `<p class="muted" style="margin:0">Целевых точек нет.</p>`}
+      <div id="tp-late">${tpLateHTML()}</div>
+      <div class="tp-foot"><button type="button" class="link" id="tp-add">Добавить точку</button></div>
+      <div class="grid2" style="margin-top:18px">
+        <label class="field" for="tp-mname">Пробник<input class="plain" id="tp-mname" maxlength="40" value="${esc(M.name)}"></label>
+        <label class="field" for="tp-mmax">Вопросов в пробнике<input class="plain" id="tp-mmax" type="number" inputmode="numeric" min="5" max="300" value="${M.max}"></label>
+      </div>
+      ${tpMsg ? `<p class="msg" role="status">${esc(tpMsg)}</p>` : ""}
+    </section>`;
+}
+function refreshTargets(){
+  S.cfg.targets.forEach(tp => { const id = tpDom(tp), s = document.getElementById(id + "-sum"), c = document.getElementById(id + "-calc"); if (s) s.innerHTML = tpSummary(tp); if (c) c.innerHTML = tpCalcHTML(tp); });
+  const ch = $("#tp-chart"); if (ch) ch.innerHTML = mockSVG();
+  const lt = $("#tp-late"); if (lt) lt.innerHTML = tpLateHTML();
+}
+/* mock results on a line towards the target points, in the same metro style as the goal route */
+function mockSVG(){
+  const host = $("#p-tests"), M = S.cfg.mock.max, t = todayISO(), rs = mockRes(), tps = sortedTargets();
+  const W = Math.max(300, Math.min(720, Math.round((host && host.clientWidth) || 640))), H = 270;
+  const L = 8, R = 46, T = 46, B = 30, w = W - L - R, h = H - T - B;
+  const x0 = S.cfg.start, x1 = tps.reduce((m, tp) => tp.date > m ? tp.date : m, S.cfg.end), span = Math.max(1, diff(x0, x1));
+  const X = d => L + 14 + Math.max(0, Math.min(1, diff(x0, d) / span)) * (w - 28);
+  const vals = rs.map(o => o.v).concat(tps.filter(tp => tp.goal).map(tp => tp.goal));
+  let lo = vals.length ? Math.min(...vals) - 4 : 0, hi = vals.length ? Math.max(...vals) + 4 : M;
+  lo = Math.max(0, Math.floor(lo / 5) * 5); hi = Math.min(M, Math.ceil(hi / 5) * 5);
+  if (hi - lo < 10) { hi = Math.min(M, lo + 10); lo = Math.max(0, hi - 10); }
+  const Y = v => T + (1 - (Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo)) * h, f1 = n => n.toFixed(1);
+  let o = `<svg class="chart route" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(S.cfg.mock.name)}: результаты и целевые точки">`;
+  const step = niceStep((hi - lo) / 4);
+  for (let v = Math.ceil(lo / step) * step; v <= hi + 0.001; v += step) o += `<line class="zline" x1="${L}" x2="${L + w}" y1="${f1(Y(v))}" y2="${f1(Y(v))}"/><text class="zl" x="${L + w + 10}" y="${f1(Y(v) + 4)}">${Math.round(v)}</text>`;
+  const months = []; { let y = Number(x0.slice(0, 4)), m = Number(x0.slice(5, 7)) + 1; if (m > 12) { m = 1; y++; } for (let i = 0; i < 40; i++) { const d = `${y}-${pad(m)}-01`; if (d > x1) break; months.push(d); m++; if (m > 12) { m = 1; y++; } } }
+  const every = months.length > 8 ? 2 : 1;
+  months.forEach((d, i) => { if (i % every === 0) o += `<text class="ax" x="${f1(X(d))}" y="${H - 8}" text-anchor="middle">${MON_S[mon(d)]}</text>`; });
+  const tx = X(t < x0 ? x0 : t > x1 ? x1 : t), last = rs[rs.length - 1];
+  if (t >= x0 && t <= x1) o += `<line class="rt-today" x1="${f1(tx)}" x2="${f1(tx)}" y1="${T - 6}" y2="${T + h}"/>`;
+  const placed = [[], []];   // labels of close points go to a second row instead of overlapping
+  tps.forEach(tp => {
+    if (tp.date < x0) return;
+    const gx = X(tp.date), lab = `${tp.name.split(/\s+/)[0]} · ${dnum(tp.date)} ${MON_S[mon(tp.date)]}`, lw = lab.length * 6.2;
+    const an = gx + lw / 2 > W - 4 ? "end" : gx - lw / 2 < 4 ? "start" : "middle", ax = an === "end" ? Math.min(gx + 6, W - 2) : gx;
+    const a = an === "end" ? ax - lw : an === "start" ? ax : ax - lw / 2, z = [a - 8, a + lw + 8];
+    const row = placed[0].some(r => r[0] < z[1] && z[0] < r[1]) ? 1 : 0; placed[row].push(z);
+    o += `<line class="rt-tp" x1="${f1(gx)}" x2="${f1(gx)}" y1="${T - 12 - row * 14}" y2="${T + h}"/><text class="sm" x="${f1(ax)}" y="${T - 18 - row * 14}" text-anchor="${an}">${esc(lab)}</text>`;
+  });
+  const ahead = tps.filter(tp => tp.goal && tp.date >= t);
+  if (last && ahead.length) {
+    const pts = [[Math.max(tx, X(last.c.win[0])), Y(last.v)]].concat(ahead.map(tp => [X(tp.date), Y(tp.goal)]));
+    o += `<polyline class="rt-plan" points="${pts.map(p => f1(p[0]) + "," + f1(p[1])).join(" ")}"/>`;
+  }
+  if (rs.length > 1) o += `<polyline class="rt-done" pathLength="1" points="${rs.map(r => f1(X(r.c.win[0])) + "," + f1(Y(r.v))).join(" ")}"/>`;
+  if (last && tx > X(last.c.win[0]) + 2) o += `<line class="rt-conn" x1="${f1(X(last.c.win[0]))}" x2="${f1(tx)}" y1="${f1(Y(last.v))}" y2="${f1(Y(last.v))}"/>`;
+  rs.forEach((r, i) => { const cx = X(r.c.win[0]), cy = Y(r.v), nx = rs[i + 1] ? X(rs[i + 1].c.win[0]) : Infinity;
+    o += `<g class="st st-done" style="--i:${i}"><circle cx="${f1(cx)}" cy="${f1(cy)}" r="7"/></g>` + (nx - cx >= 26 ? `<text class="sv" x="${f1(cx)}" y="${f1(cy - 14)}" text-anchor="middle">${r.v}</text>` : ""); });
+  tps.forEach((tp, i) => {
+    if (!tp.goal || tp.date < x0) return;
+    const gx = X(tp.date), gy = Y(tp.goal), fin = i === tps.length - 1;
+    o += fin ? `<g class="st st-goal" style="--i:${rs.length + i}"><circle class="st-goal-ring" cx="${f1(gx)}" cy="${f1(gy)}" r="12"/><circle cx="${f1(gx)}" cy="${f1(gy)}" r="12"/><circle class="st-goal-in" cx="${f1(gx)}" cy="${f1(gy)}" r="4.5"/></g>`
+      : `<g class="st st-goal" style="--i:${rs.length + i}"><circle cx="${f1(gx)}" cy="${f1(gy)}" r="9"/></g>`;
+    o += `<text class="sg" x="${f1(gx)}" y="${f1(gy - (fin ? 22 : 18))}" text-anchor="end">цель ${tp.goal}</text>`;
+  });
+  if (last && t >= x0 && t <= x1) {
+    const hy = Y(last.v), lw = 74, lx = Math.max(L, Math.min(W - R - lw, tx - lw / 2));
+    o += `<g class="rt-train"><circle cx="${f1(tx)}" cy="${f1(hy)}" r="6"/></g>`;
+    if (W >= 520) o += `<g class="rt-here"><rect x="${f1(lx)}" y="${f1(hy + 14)}" width="${lw}" height="22" rx="11"/><text x="${f1(lx + lw / 2)}" y="${f1(hy + 29)}" text-anchor="middle">вы здесь</text></g>`;
+  }
+  if (!rs.length) o += `<text class="empty" x="${W / 2}" y="${T + h / 2}" text-anchor="middle">Запишите первый пробник в контрольной точке</text>`;
+  return o + "</svg>";
+}
+/* Today: the nearest target points with a countdown */
+function tpChipsHTML(){
+  const t = todayISO(), all = sortedTargets(), up = all.filter(tp => tp.date >= t).slice(0, 2);
+  if (!up.length) return "";
+  return `<div class="tp-chips">${up.map(tp => { const n = diff(t, tp.date), fin = all.length > 1 && all[all.length - 1].id === tp.id;
+    return `<button type="button" class="tp-chip" data-tab="tests" data-scroll="targets"><i class="tp-ic${fin ? " fin" : ""}" aria-hidden="true">${fin ? "" : FLAG_SVG}</i><span><b>${esc(tp.name)}</b> <span class="nw">${n ? `через ${n} ${plural(n, DAYW)}` : "сегодня"}</span></span><small>${dnum(tp.date)} ${MON_S[mon(tp.date)]}</small></button>`; }).join("")}</div>`;
+}
+function onTarget(el, final){
+  if (el.id === "tp-mname") { S.cfg.mock.name = el.value.slice(0, 40).trim() || "Пробник"; if (final) { el.value = S.cfg.mock.name; saveAll(); renderTests(true); } else saveSoon(); return; }
+  if (el.id === "tp-mmax") { if (!final) return; S.cfg.mock.max = clampInt(el.value, 5, 300, S.cfg.mock.max); S.cfg.targets.forEach(tp => { if (tp.goal > S.cfg.mock.max) tp.goal = S.cfg.mock.max; }); saveAll(); renderTests(true); return; }
+  const tp = S.cfg.targets.find(x => x.id === el.dataset.tp); if (!tp) return;
+  const f = el.dataset.tf;
+  if (f === "name") { tp.name = el.value.slice(0, 60); if (final && !tp.name.trim()) { tp.name = "Целевая точка"; el.value = tp.name; } }
+  else if (f === "note") tp.note = el.value.slice(0, 300);
+  else if (f === "goal") { const n = parseInt(el.value, 10); tp.goal = n >= 1 ? Math.min(n, S.cfg.mock.max) : null; if (final) el.value = tp.goal ?? ""; }
+  else if (f === "date") { if (!final) return; if (!isISO(el.value)) { el.value = tp.date; return; } tp.date = el.value; saveAll(); renderTests(true); return; }
+  if (final) saveAll(); else saveSoon();
+  refreshTargets();
+}
+
 /* ---------- «Маршрут»: the way to the goal drawn as a metro line ----------
    x = calendar time from the start to the deadline, y = test score. Results are stations on a solid line,
    «вы здесь» sits at today, the planned way runs dashed through the milestones to the goal terminus. */
@@ -2366,6 +2577,9 @@ function routeSVG(big){
   const tx = X(t < x0 ? x0 : t), last = rs[rs.length - 1];
   // today
   if (t >= x0 && t <= S.cfg.end) o += `<line class="rt-today" x1="${f1(tx)}" x2="${f1(tx)}" y1="${T - 6}" y2="${T + h}"/>`;
+  // target points inside the plan: a dashed flag line with the name on top
+  sortedTargets().forEach(tp => { if (tp.date < x0 || tp.date > S.cfg.end) return; const gx = X(tp.date), an = gx > W - R - 44 ? "end" : "middle";
+    o += `<line class="rt-tp" x1="${f1(gx)}" x2="${f1(gx)}" y1="${T - 12}" y2="${T + h}"/><text class="sm" x="${f1(an === "end" ? gx + 6 : gx)}" y="${T - 18}" text-anchor="${an}">${esc(tp.name.split(/\s+/)[0])}</text>`; });
   // the planned way: from «вы здесь» through the milestones ahead to the goal
   if (g.score && ms && last) {
     const from = [Math.max(tx, X(last.c.win[0])), Y(last.v)];
@@ -2404,7 +2618,7 @@ function routeSVG(big){
 }
 const goalChart = () => isRoute() ? routeSVG(true) : chartSVG();
 const goalKeys = () => isRoute()
-  ? `<div class="keys">${lineKey("k-rt")}Пройдено${lineKey("k-rp")}Путь по ориентирам<svg width="18" height="18" aria-hidden="true"><circle class="k-goal" cx="9" cy="9" r="6"/></svg>Цель в итоговом тесте</div>`
+  ? `<div class="keys">${lineKey("k-rt")}Пройдено${lineKey("k-rp")}Путь по ориентирам<svg width="18" height="18" aria-hidden="true"><circle class="k-goal" cx="9" cy="9" r="6"/></svg>Цель в итоговом тесте${S.cfg.targets.some(tp => tp.date >= S.cfg.start && tp.date <= S.cfg.end) ? `<svg width="12" height="18" aria-hidden="true"><line class="k-tp" x1="6" x2="6" y1="2" y2="16"/></svg>Целевая точка` : ""}</div>`
   : `<div class="keys">${lineKey("k-ln")}Результат${lineKey("k-tg")}Ориентир${lineKey("k-pl")}Цель</div>`;
 
 /* ---------- motion: only on entering a screen and in answer to an action ---------- */
@@ -2574,7 +2788,7 @@ document.addEventListener("click", e => {
   const ds = b.dataset;
   if (ds.tab) {
     const fromTab = tab;
-    setTab(ds.tab); exportMsg = ""; goalMsg = ""; calMsg = ""; cuMsg = ""; updMsg = ""; if (ds.open) { openChecks.clear(); openChecks.add(ds.open); }
+    setTab(ds.tab); exportMsg = ""; goalMsg = ""; calMsg = ""; cuMsg = ""; updMsg = ""; tpMsg = ""; if (ds.open) { openChecks.clear(); openChecks.add(ds.open); }
     renderHeader(); if (tab === "tests") renderTests(true); else renderAll();
     if (fromTab !== tab) slideIn([$("#p-" + tab)], TAB_ORDER.indexOf(tab) - TAB_ORDER.indexOf(fromTab));
     playIn($("#p-" + tab));
@@ -2598,6 +2812,11 @@ document.addEventListener("click", e => {
   if (ds.step) { const it = draftItem(b); if (!it) return; it.min = clampInt(it.min + Number(ds.step), 5, 600, 30); const ed = b.closest(".ed"); ed.querySelector('[data-f="min"]').value = it.min; ed.querySelector("[data-wm]").textContent = `${it.min * it.days.length} мин в неделю`; planTouched(); return; }
   if (ds.sk) { const it = draftItem(b); if (!it) return; const k = ds.sk; it.skills = (it.skills || []).includes(k) ? it.skills.filter(x => x !== k) : (it.skills || []).concat(k); b.setAttribute("aria-pressed", String(it.skills.includes(k))); planTouched(); return; }
   if (ds.shift) { setDeadline(addMonths(S.cfg.end, Number(ds.shift))); renderHeader(); renderTests(true); playEl($("#g-chart") && $("#g-chart").closest("section")); playEl($("#g-plan") && $("#g-plan").closest("section")); return; }
+  if (ds.endto) { setDeadline(ds.endto); renderHeader(); renderTests(true); const tg = $("#targets"); if (tg) tg.scrollIntoView({block:"start"}); playEl($("#g-chart") && $("#g-chart").closest("section")); return; }
+  if (b.id === "tp-add") { const t = todayISO(), tp = { id:newId(), name:"Новая точка", date: add(t < S.cfg.start ? S.cfg.start : t, 30), goal:null, note:"" };
+    S.cfg.targets.push(tp); openTps.add(tp.id); tpMsg = ""; saveAll(); renderTests(true); const inp = document.getElementById(tpDom(tp) + "-n"); if (inp) { inp.focus(); inp.select(); } return; }
+  if (ds.tpdel) { if (tpDelArm === ds.tpdel) { const gone = S.cfg.targets.find(x => x.id === ds.tpdel); S.cfg.targets = S.cfg.targets.filter(x => x.id !== ds.tpdel); tpDelArm = null; clearTimeout(tpArmT); saveAll(); tpMsg = gone ? `Точка «${gone.name}» удалена.` : ""; renderTests(true); const tg = $("#targets"); if (tg) tg.scrollIntoView({block:"start"}); }
+    else { tpDelArm = ds.tpdel; b.textContent = "Нажмите ещё раз, чтобы удалить"; b.classList.add("armed"); clearTimeout(tpArmT); tpArmT = setTimeout(() => { tpDelArm = null; if (b.isConnected) { b.textContent = "Удалить точку"; b.classList.remove("armed"); } }, 4000); } return; }
   if (ds.cuw) { cuWeeks = Number(ds.cuw); cuMsg = ""; const el = $("#catchup"); if (el) { el.outerHTML = catchupHTML(); const nb = document.querySelector(`[data-cuw="${ds.cuw}"]`); if (nb) nb.focus(); } return; }
   if (ds.cu === "on") { const pr = catchupProposal(cuWeeks); if (pr) applyCatchup(pr); renderAll(); playEl($("#catchup")); playEl($("#pl-week") && $("#pl-week").closest("section")); return; }
   if (ds.cu === "off") { cancelCatchup(); renderAll(); return; }
@@ -2625,7 +2844,9 @@ $("#t-list").addEventListener("keydown", e => { if (e.key === "Enter" && e.targe
 $("#t-off").addEventListener("change", e => { editDay(sel, r => { r.off = e.target.checked; }); saveAll(); renderAll(); });
 
 const pt = $("#p-tests");
-pt.addEventListener("toggle", e => { const d = e.target; if (d.matches && d.matches("details.ck")) d.open ? openChecks.add(d.dataset.k) : openChecks.delete(d.dataset.k); }, true);
+pt.addEventListener("toggle", e => { const d = e.target; if (!d.matches) return;
+  if (d.matches("details.tp")) d.open ? openTps.add(d.dataset.tp) : openTps.delete(d.dataset.tp);
+  else if (d.matches("details.ck")) d.open ? openChecks.add(d.dataset.k) : openChecks.delete(d.dataset.k); }, true);
 function onTest(e){
   const el = e.target;
   if (el.id === "g-level") { // a level stands for its lowest score, unless the current score is already inside it
@@ -2643,6 +2864,7 @@ function onTest(e){
   let v;
   if (el.type === "checkbox") v = el.checked;
   else if (f === "efset") { const n = parseInt(el.value, 10); v = n >= 1 && n <= 100 ? n : null; }
+  else if (f === "mock") { const n = parseInt(el.value, 10); v = n >= 0 && n <= S.cfg.mock.max ? n : null; }
   else v = el.value.slice(0, 2000);
   editTest(k, f, v);
   if (f === "efset") {
@@ -2653,8 +2875,10 @@ function onTest(e){
   if (el.type === "checkbox" || el.tagName === "SELECT") saveAll(); else saveSoon();
   refreshTests();
 }
-pt.addEventListener("input", e => { if (e.target.id !== "g-end" && e.target.type !== "checkbox" && e.target.tagName !== "SELECT") onTest(e); });
+const isTpField = el => !!(el.dataset.tf || el.id === "tp-mname" || el.id === "tp-mmax");
+pt.addEventListener("input", e => { if (isTpField(e.target)) { onTarget(e.target, false); return; } if (e.target.id !== "g-end" && e.target.type !== "checkbox" && e.target.tagName !== "SELECT") onTest(e); });
 pt.addEventListener("change", e => {
+  if (isTpField(e.target)) { onTarget(e.target, true); return; }
   if (e.target.id === "g-end") { if (e.target.value && e.target.value !== S.cfg.end) { setDeadline(e.target.value); renderHeader(); renderTests(true); playEl($("#g-chart") && $("#g-chart").closest("section")); } return; }
   if (e.target.type === "checkbox" || e.target.tagName === "SELECT") onTest(e);
 });
