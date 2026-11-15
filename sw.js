@@ -1,5 +1,5 @@
 // Трекер английского — офлайн-кэш. При каждом обновлении файлов меняйте VERSION.
-const VERSION = "eng-2";
+const VERSION = "eng-4";
 const ASSETS = ["./", "index.html", "manifest.webmanifest", "icon-180.png", "icon-192.png", "icon-512.png"];
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(ASSETS.map(u => new Request(u, { cache: "reload" })))).then(() => self.skipWaiting()));
